@@ -23,9 +23,23 @@ struct PushLogicApp: App {
         }
     }()
 
+    @State private var hasFinishedSplash = false
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ZStack {
+                if hasFinishedSplash {
+                    RootView()
+                        .transition(.opacity)
+                } else {
+                    SplashView {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            hasFinishedSplash = true
+                        }
+                    }
+                    .transition(.opacity)
+                }
+            }
         }
         .modelContainer(sharedModelContainer)
     }

@@ -40,7 +40,8 @@ struct RootView: View {
         switch state.selectedDestination {
         case .home:
             NavigationStack(path: $state.homePath) {
-                DestinationPlaceholder(destination: .home)
+                DashboardView()
+                    .toolbar(.hidden, for: .navigationBar)
             }
             .transition(.opacity)
         case .friends:
