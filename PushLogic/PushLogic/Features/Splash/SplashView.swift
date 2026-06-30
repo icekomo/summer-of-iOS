@@ -86,6 +86,7 @@ struct SplashView: View {
     }
 }
 
-#Preview {
+#Preview("Splash") {
     SplashView()
+        .preferredColorScheme(.dark)
 }

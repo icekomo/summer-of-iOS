@@ -10,20 +10,47 @@ import SwiftData
 
 @main
 struct PushLogicApp: App {
-    var sharedModelContainer: ModelContainer = {
+    let modelContainer: ModelContainer
+    let appEnvironment: AppEnvironment
+
+    @State private var hasFinishedSplash = false
+
+    init() {
         let schema = Schema([
             Item.self,
+            Challenge.self,
+            Participant.self,
+            ActivityRecord.self,
+            Achievement.self,
+            UserSettings.self
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let modelConfiguration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false
+        )
 
+        let container: ModelContainer
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            container = try ModelContainer(
+                for: schema,
+                configurations: [modelConfiguration]
+            )
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
-    }()
+        self.modelContainer = container
 
-    @State private var hasFinishedSplash = false
+        let context = container.mainContext
+        let repositories = RepositoryContainer(
+            challenges: ChallengeRepository(context: context),
+            activities: ActivityRepository(context: context),
+            settings: SettingsRepository(context: context)
+        )
+        self.appEnvironment = AppEnvironment(
+            repositories: repositories,
+            router: AppRouter()
+        )
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -40,7 +67,9 @@ struct PushLogicApp: App {
                     .transition(.opacity)
                 }
             }
+            .preferredColorScheme(.dark)
+            .environment(appEnvironment)
         }
-        .modelContainer(sharedModelContainer)
+        .modelContainer(modelContainer)
     }
 }

@@ -2,24 +2,44 @@
 //  DashboardView.swift
 //  PushLogic
 //
-//  Home tab layout scaffolding. Defines the section order and spacing
-//  using the design system; each section is an empty labeled
-//  placeholder until its real content is built.
+//  Home tab screen. Drives all sections from DashboardViewModel, which
+//  reads from the activity and challenge repositories via AppEnvironment.
+//  Friend Activity still uses mock data — there is no friends repository
+//  yet.
 //
 
 import SwiftUI
+import SwiftData
 
 struct DashboardView: View {
+    @Environment(AppEnvironment.self) private var environment: AppEnvironment?
+    @State private var viewModel: DashboardViewModel?
+
+    private static let amber = Color(red: 0.96, green: 0.78, blue: 0.30)
+
     var body: some View {
         ScrollView {
             VStack(spacing: AppSpacing.lg) {
                 DashboardHeader()
-                todayProgressPlaceholder
-                statisticsPlaceholder
-                weeklyStreakPlaceholder
-                activityChartPlaceholder
-                activeChallengesPlaceholder
-                friendActivityPlaceholder
+
+                if let viewModel {
+                    TodayProgressCard(
+                        current: viewModel.todayPushups,
+                        goal: viewModel.todayGoal,
+                        streakDays: viewModel.currentStreak
+                    )
+                    statisticsRow(viewModel: viewModel)
+                    WeeklyStreakCard(days: viewModel.weekDays)
+                    ActivityChartCard(
+                        weeklyData: viewModel.weeklyChartData,
+                        monthlyData: viewModel.monthlyChartData
+                    )
+                    ActiveChallengesSection(challenges: viewModel.activeChallenges)
+                    FriendActivitySection()
+                } else {
+                    LoadingView()
+                        .frame(minHeight: 400)
+                }
             }
             .padding(.horizontal, AppSpacing.lg)
             .padding(.top, AppSpacing.lg)
@@ -27,54 +47,70 @@ struct DashboardView: View {
         }
         .scrollIndicators(.hidden)
         .background(AppColors.background.ignoresSafeArea())
+        .task { await load() }
     }
 
-    // MARK: Section placeholders
+    // MARK: Sections
 
-    private var todayProgressPlaceholder: some View {
-        sectionPlaceholder(title: "Today's Progress", height: 180)
+    private func statisticsRow(viewModel: DashboardViewModel) -> some View {
+        HStack(spacing: AppSpacing.md) {
+            DashboardStatCard(
+                systemImage: "flame.fill",
+                iconTint: AppColors.primary,
+                iconBackground: AppColors.accent,
+                value: "\(viewModel.dayStreak)",
+                title: "Day Streak"
+            )
+            DashboardStatCard(
+                systemImage: "trophy.fill",
+                iconTint: Self.amber,
+                iconBackground: Self.amber.opacity(0.18),
+                value: "\(viewModel.bestDay)",
+                title: "Best Day"
+            )
+            DashboardStatCard(
+                systemImage: "chart.line.uptrend.xyaxis",
+                iconTint: AppColors.accent,
+                iconBackground: AppColors.accent.opacity(0.18),
+                value: "\(viewModel.thisWeek)",
+                title: "This Week"
+            )
+        }
     }
 
-    private var statisticsPlaceholder: some View {
-        sectionPlaceholder(title: "Statistics", height: 110)
-    }
+    // MARK: Lifecycle
 
-    private var weeklyStreakPlaceholder: some View {
-        sectionPlaceholder(title: "Weekly Streak", height: 130)
-    }
-
-    private var activityChartPlaceholder: some View {
-        sectionPlaceholder(title: "Activity Chart", height: 220)
-    }
-
-    private var activeChallengesPlaceholder: some View {
-        sectionPlaceholder(title: "Active Challenges", height: 260)
-    }
-
-    private var friendActivityPlaceholder: some View {
-        sectionPlaceholder(title: "Friend Activity", height: 200)
-    }
-
-    // MARK: Builder
-
-    private func sectionPlaceholder(title: String, height: CGFloat) -> some View {
-        RoundedRectangle(cornerRadius: AppCornerRadius.lg, style: .continuous)
-            .fill(AppColors.secondaryBackground)
-            .frame(height: height)
-            .overlay {
-                Text(title)
-                    .font(AppTypography.headline)
-                    .foregroundStyle(AppColors.secondaryText)
-            }
+    private func load() async {
+        guard let environment else { return }
+        if viewModel == nil {
+            viewModel = DashboardViewModel(
+                challenges: environment.repositories.challenges,
+                activities: environment.repositories.activities
+            )
+        }
+        viewModel?.refresh()
     }
 }
 
-#Preview("Dark") {
-    DashboardView()
+#Preview("Dashboard") {
+    let schema = Schema([
+        Challenge.self,
+        Participant.self,
+        ActivityRecord.self,
+        Achievement.self,
+        UserSettings.self
+    ])
+    let config = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try! ModelContainer(for: schema, configurations: config)
+    let context = container.mainContext
+    let repos = RepositoryContainer(
+        challenges: ChallengeRepository(context: context),
+        activities: ActivityRepository(context: context),
+        settings: SettingsRepository(context: context)
+    )
+    let env = AppEnvironment(repositories: repos, router: AppRouter())
+
+    return DashboardView()
+        .environment(env)
         .preferredColorScheme(.dark)
-}
-
-#Preview("Light") {
-    DashboardView()
-        .preferredColorScheme(.light)
 }
